@@ -1,0 +1,366 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum SubscriptionStatus {
+  FREE
+  BASIC
+  PRO
+  EXPIRED
+}
+
+enum GameType {
+  MICRO_LESSON
+  PUZZLE_DRAG_DROP
+  PUZZLE_REORDER
+  CODE_COMPLETION
+  TIMED_CHALLENGE
+  SCENARIO_SIMULATION
+}
+
+enum Difficulty {
+  BASICS
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  PASSED
+  FAILED
+  TIMEOUT
+}
+
+enum RoomStatus {
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  ACTIVE
+  CANCELLED
+  REFUNDED
+}
+
+enum LeaderboardScope {
+  GLOBAL
+  FRIENDS
+  TRACK
+}
+
+enum LeaderboardPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+  ALL_TIME
+}
+
+model User {
+  id                  String             @id @default(uuid())
+  name                String
+  email               String             @unique
+  phone               String?
+  hashedPassword      String?            @map("hashed_password")
+  role                UserRole           @default(USER)
+  subscriptionStatus  SubscriptionStatus @default(FREE) @map("subscription_status")
+  subscriptionEndsAt    DateTime?          @map("subscription_ends_at")
+  avatarUrl           String?            @map("avatar_url")
+  xp                  Int                @default(0)
+  streakDays          Int                @default(0) @map("streak_days")
+  lastActiveAt        DateTime?          @map("last_active_at")
+  isBanned            Boolean            @default(false) @map("is_banned")
+  isMuted             Boolean            @default(false) @map("is_muted")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  refreshTokens       RefreshToken[]
+  selectedTracks      UserTrack[]
+  freePlayCredits     FreePlayCredit[]
+  attempts            Attempt[]
+  leaderboardEntries  LeaderboardEntry[]
+  hostedRooms         MultiplayerRoom[]  @relation("RoomHost")
+  roomParticipants    RoomParticipant[]
+  subscriptionPayments SubscriptionPayment[]
+  friendshipsSent     Friendship[]       @relation("FriendshipSender")
+  friendshipsReceived Friendship[]       @relation("FriendshipReceiver")
+  badges              UserBadge[]
+  adminAuditLogs      AdminAuditLog[]    @relation("AdminActor")
+  passwordResetTokens PasswordResetToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+model Track {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  title       String
+  description String
+  icon        String?
+  isPremium   Boolean  @default(false) @map("is_premium")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  topics       Topic[]
+  userTracks   UserTrack[]
+  freeCredits  FreePlayCredit[]
+
+  @@map("tracks")
+}
+
+model Topic {
+  id         String     @id @default(uuid())
+  trackId    String     @map("track_id")
+  title      String
+  slug       String
+  difficulty Difficulty @default(BASICS)
+  order      Int        @default(0)
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  track   Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  @@unique([trackId, slug])
+  @@index([trackId])
+  @@map("topics")
+}
+
+model Lesson {
+  id         String     @id @default(uuid())
+  topicId    String     @map("topic_id")
+  title      String
+  gameType   GameType   @map("game_type")
+  difficulty Difficulty @default(BASICS)
+  configJson Json       @map("config_json")
+  content    String     @db.Text
+  points     Int        @default(10)
+  order      Int        @default(0)
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  topic     Topic      @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  testcases Testcase[]
+  attempts  Attempt[]
+
+  @@index([topicId])
+  @@map("lessons")
+}
+
+model Testcase {
+  id             String  @id @default(uuid())
+  lessonId       String  @map("lesson_id")
+  input          String  @db.Text
+  expectedOutput String  @map("expected_output") @db.Text
+  isHidden       Boolean @default(false) @map("is_hidden")
+  order          Int     @default(0)
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
+  @@map("testcases")
+}
+
+model UserTrack {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  trackId   String   @map("track_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, trackId])
+  @@map("user_tracks")
+}
+
+model FreePlayCredit {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  trackId   String   @map("track_id")
+  remaining Int      @default(10)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, trackId])
+  @@map("free_play_credits")
+}
+
+model Attempt {
+  id          String        @id @default(uuid())
+  userId      String        @map("user_id")
+  lessonId    String        @map("lesson_id")
+  score       Int           @default(0)
+  xpEarned    Int           @default(0) @map("xp_earned")
+  status      AttemptStatus @default(IN_PROGRESS)
+  runtimeInfo Json?         @map("runtime_info")
+  submittedAt DateTime?     @map("submitted_at")
+  syncedAt    DateTime?     @map("synced_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([lessonId])
+  @@map("attempts")
+}
+
+model LeaderboardEntry {
+  id        String            @id @default(uuid())
+  scope     LeaderboardScope
+  period    LeaderboardPeriod
+  trackId   String?           @map("track_id")
+  userId    String            @map("user_id")
+  score     Int               @default(0)
+  rank      Int?
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([scope, period, userId, trackId])
+  @@index([scope, period, score])
+  @@map("leaderboard_entries")
+}
+
+model MultiplayerRoom {
+  id        String     @id @default(uuid())
+  hostId    String     @map("host_id")
+  roomCode  String     @unique @map("room_code")
+  lessonId  String?    @map("lesson_id")
+  status    RoomStatus @default(WAITING)
+  maxPlayers Int       @default(2) @map("max_players")
+  createdAt DateTime   @default(now()) @map("created_at")
+  startedAt DateTime?  @map("started_at")
+  endedAt   DateTime?  @map("ended_at")
+
+  host         User              @relation("RoomHost", fields: [hostId], references: [id])
+  participants RoomParticipant[]
+
+  @@map("multiplayer_rooms")
+}
+
+model RoomParticipant {
+  id       String  @id @default(uuid())
+  roomId   String  @map("room_id")
+  userId   String  @map("user_id")
+  score    Int     @default(0)
+  isWinner Boolean @default(false) @map("is_winner")
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  room MultiplayerRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@map("room_participants")
+}
+
+model SubscriptionPayment {
+  id         String             @id @default(uuid())
+  userId     String             @map("user_id")
+  providerId String             @map("provider_id")
+  planId     String             @map("plan_id")
+  status     PaymentStatus      @default(PENDING)
+  amount     Int
+  currency   String             @default("usd")
+  startAt    DateTime?          @map("start_at")
+  endAt      DateTime?          @map("end_at")
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("subscription_payments")
+}
+
+model Friendship {
+  id         String   @id @default(uuid())
+  senderId   String   @map("sender_id")
+  receiverId String   @map("receiver_id")
+  status     String   @default("accepted")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  sender   User @relation("FriendshipSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("FriendshipReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@map("friendships")
+}
+
+model Badge {
+  id          String @id @default(uuid())
+  slug        String @unique
+  title       String
+  description String
+  icon        String?
+
+  users UserBadge[]
+
+  @@map("badges")
+}
+
+model UserBadge {
+  id       String   @id @default(uuid())
+  userId   String   @map("user_id")
+  badgeId  String   @map("badge_id")
+  earnedAt DateTime @default(now()) @map("earned_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@map("user_badges")
+}
+
+model AdminAuditLog {
+  id        String   @id @default(uuid())
+  adminId   String   @map("admin_id")
+  action    String
+  target    String
+  metadata  Json?
+  timestamp DateTime @default(now())
+
+  admin User @relation("AdminActor", fields: [adminId], references: [id])
+
+  @@index([adminId])
+  @@map("admin_audit_log")
+}

@@ -1,0 +1,126 @@
+openapi: 3.0.3
+info:
+  title: SkillPlay API
+  version: 1.0.0
+  description: Gamified learning platform API
+
+servers:
+  - url: http://localhost:3000
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+
+  /auth/signup:
+    post:
+      summary: Register new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                trackIds: { type: array, items: { type: string, format: uuid } }
+      responses:
+        '201':
+          description: User created
+
+  /auth/login:
+    post:
+      summary: Login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: Tokens returned
+
+  /tracks:
+    get:
+      summary: List all tracks
+      responses:
+        '200':
+          description: Track list
+
+  /play/start:
+    post:
+      summary: Start a play session
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lessonId]
+              properties:
+                lessonId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Session started
+        '402':
+          description: Free plays exhausted
+
+  /play/submit:
+    post:
+      summary: Submit answer or code
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Graded result
+
+  /leaderboard/global:
+    get:
+      summary: Global leaderboard
+      parameters:
+        - name: period
+          in: query
+          schema: { type: string, enum: [DAILY, WEEKLY, MONTHLY, ALL_TIME] }
+      responses:
+        '200':
+          description: Rankings
+
+  /payments/checkout:
+    post:
+      summary: Mock checkout
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Checkout session
+
+  /payments/mock/complete:
+    post:
+      summary: Complete mock payment
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Subscription activated
+
+  /rooms/create:
+    post:
+      summary: Create multiplayer room
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201':
+          description: Room created
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

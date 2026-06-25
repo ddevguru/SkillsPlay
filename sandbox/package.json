@@ -1,0 +1,13 @@
+{
+  "name": "skillplay-sandbox",
+  "version": "1.0.0",
+  "description": "Isolated code execution sandbox for SkillPlay",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
