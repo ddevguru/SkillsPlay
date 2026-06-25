@@ -5,6 +5,8 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$APP_DIR"
 
+echo "Working directory: $APP_DIR"
+
 if [[ ! -f gcp/vm/.env ]]; then
   echo "Missing gcp/vm/.env — run: bash gcp/vm/generate-env.sh"
   exit 1

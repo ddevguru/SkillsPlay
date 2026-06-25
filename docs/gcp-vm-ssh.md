@@ -2,6 +2,9 @@
 
 Cloud Run / Terraform **nahi** chahiye. Ek GCP Compute Engine VM par SSH karke sab chalao.
 
+> **Note:** Repo kahi bhi ho sakta hai — `~/SkillsPlay`, `/opt/skillplay`, etc.  
+> Neeche `cd` apne actual folder se replace karo. `ls ~` se folder ka naam check karo.
+
 ## Architecture (VM par)
 
 ```
@@ -88,7 +91,12 @@ cd /opt/skillplay
 ## Step 4: Install + Start (VM par yeh commands)
 
 ```bash
-cd /opt/skillplay
+# Apna repo path — tumhare case mein:
+cd ~/SkillsPlay
+
+# Ya jahan clone hua ho, wahan cd karo:
+# cd ~/skillplay
+# cd /opt/skillplay
 
 # Scripts executable banao
 chmod +x gcp/vm/*.sh
