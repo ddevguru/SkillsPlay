@@ -1,4 +1,5 @@
 const SANDBOX_URL = process.env.SANDBOX_URL || 'http://localhost:4001';
+const USE_IDENTITY = process.env.SANDBOX_USE_IDENTITY === 'true';
 
 export interface SandboxResult {
   passed: boolean;
@@ -13,6 +14,34 @@ export interface SandboxResult {
   totalRuntimeMs: number;
 }
 
+async function getGcpIdentityToken(audience: string): Promise<string | null> {
+  if (!USE_IDENTITY) return null;
+  try {
+    const res = await fetch(
+      `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(audience)}`,
+      { headers: { 'Metadata-Flavor': 'Google' } }
+    );
+    if (!res.ok) return null;
+    return res.text();
+  } catch {
+    return null;
+  }
+}
+
+async function sandboxFetch(body: Record<string, unknown>): Promise<Response> {
+  const baseUrl = SANDBOX_URL.replace(/\/$/, '');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+  const token = await getGcpIdentityToken(baseUrl);
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  return fetch(`${baseUrl}/run`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+}
+
 export async function runCodeInSandbox(params: {
   language: string;
   code: string;
@@ -20,16 +49,12 @@ export async function runCodeInSandbox(params: {
   timeLimitMs?: number;
   memoryLimitMb?: number;
 }): Promise<SandboxResult> {
-  const response = await fetch(`${SANDBOX_URL}/run`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      language: params.language,
-      code: params.code,
-      testcases: params.testcases.map((tc) => ({ input: tc.input, expected: tc.expectedOutput })),
-      timeLimitMs: params.timeLimitMs ?? 5000,
-      memoryLimitMb: params.memoryLimitMb ?? 128,
-    }),
+  const response = await sandboxFetch({
+    language: params.language,
+    code: params.code,
+    testcases: params.testcases.map((tc) => ({ input: tc.input, expected: tc.expectedOutput })),
+    timeLimitMs: params.timeLimitMs ?? 5000,
+    memoryLimitMb: params.memoryLimitMb ?? 128,
   });
 
   if (!response.ok) {

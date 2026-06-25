@@ -1,0 +1,9 @@
+project_id   = "your-gcp-project-id"
+region       = "asia-south1"
+app_name     = "skillplay"
+db_tier      = "db-f1-micro"
+cors_origin  = "*"
+
+# Leave empty on first terraform apply; deploy script sets these
+backend_image = ""
+sandbox_image = ""

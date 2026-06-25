@@ -1,0 +1,98 @@
+steps:
+  # ── Build images ──
+  - name: gcr.io/cloud-builders/docker
+    id: build-backend
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/backend:${SHORT_SHA}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/backend:latest
+      - -f
+      - backend/Dockerfile
+      - backend
+
+  - name: gcr.io/cloud-builders/docker
+    id: build-sandbox
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/sandbox:${SHORT_SHA}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/sandbox:latest
+      - -f
+      - sandbox/Dockerfile
+      - sandbox
+
+  - name: gcr.io/cloud-builders/docker
+    args: [push, --all-tags, ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/backend]
+
+  - name: gcr.io/cloud-builders/docker
+    args: [push, --all-tags, ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/sandbox]
+
+  # ── Deploy sandbox (private) ──
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy-sandbox
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        gcloud run deploy ${_APP_NAME}-sandbox \
+          --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/sandbox:${SHORT_SHA} \
+          --region=${_REGION} \
+          --platform=managed \
+          --port=4001 \
+          --memory=1Gi \
+          --cpu=2 \
+          --timeout=60 \
+          --no-allow-unauthenticated \
+          --service-account=${_APP_NAME}-sandbox@${PROJECT_ID}.iam.gserviceaccount.com \
+          --quiet
+
+  # ── Deploy backend (reads sandbox URL automatically) ──
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy-backend
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        SANDBOX_URL=$$(gcloud run services describe ${_APP_NAME}-sandbox \
+          --region=${_REGION} --format='value(status.url)')
+        echo "Sandbox URL: $$SANDBOX_URL"
+
+        gcloud run deploy ${_APP_NAME}-api \
+          --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/backend:${SHORT_SHA} \
+          --region=${_REGION} \
+          --platform=managed \
+          --port=3000 \
+          --memory=512Mi \
+          --cpu=1 \
+          --timeout=300 \
+          --allow-unauthenticated \
+          --service-account=${_APP_NAME}-api@${PROJECT_ID}.iam.gserviceaccount.com \
+          --add-cloudsql-instances=${_CLOUDSQL_CONNECTION} \
+          --set-secrets=DATABASE_URL=${_APP_NAME}-database-url:latest,JWT_SECRET=${_APP_NAME}-jwt-secret:latest,JWT_REFRESH_SECRET=${_APP_NAME}-jwt-refresh-secret:latest \
+          --set-env-vars="NODE_ENV=production,PORT=3000,SANDBOX_USE_IDENTITY=true,MOCK_PAYMENTS=true,FREE_PLAYS_PER_TOPIC=10,CORS_ORIGIN=${_CORS_ORIGIN},SANDBOX_URL=$$SANDBOX_URL" \
+          --quiet
+
+        # Update seed job image
+        gcloud run jobs update ${_APP_NAME}-seed \
+          --region=${_REGION} \
+          --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/backend:${SHORT_SHA} \
+          --quiet 2>/dev/null || true
+
+substitutions:
+  _REGION: asia-south1
+  _REPO: skillplay-images
+  _APP_NAME: skillplay
+  _CLOUDSQL_CONNECTION: ""
+  _CORS_ORIGIN: "*"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/backend:${SHORT_SHA}
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/sandbox:${SHORT_SHA}

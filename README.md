@@ -135,11 +135,20 @@ cd frontend && flutter test
 k6 run load-tests/api-load.js   # requires k6 installed
 ```
 
-## Deployment (Render)
+## Deployment
 
-One-click deploy via [render.yaml](render.yaml). Full guide: [docs/render-hosting.md](docs/render-hosting.md)
+| Platform | Guide |
+|----------|-------|
+| **GCP (recommended)** | [docs/gcp-hosting.md](docs/gcp-hosting.md) — one-command deploy |
+| Render | [docs/render-hosting.md](docs/render-hosting.md) |
+| General | [docs/deployment-runbook.md](docs/deployment-runbook.md) |
 
-Launch checklist: [docs/launch-checklist.md](docs/launch-checklist.md)
+### GCP quick deploy
+
+```powershell
+cd gcp\scripts
+.\deploy.ps1 -ProjectId "YOUR_GCP_PROJECT_ID" -RunSeed
+```
 
 ## Sprint Roadmap
 

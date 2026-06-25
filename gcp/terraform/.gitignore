@@ -1,0 +1,9 @@
+# Terraform local state (use GCS backend in production)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+!terraform.tfvars.example
+crash.log
+override.tf
