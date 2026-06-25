@@ -58,3 +58,17 @@ jobs:
         working-directory: frontend
       - run: flutter test
         working-directory: frontend
+
+  admin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+        working-directory: admin
+      - run: npm run build
+        working-directory: admin
+        env:
+          VITE_API_URL: http://localhost:3000

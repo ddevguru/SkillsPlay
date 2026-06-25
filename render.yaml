@@ -1,0 +1,84 @@
+# SkillPlay — Render Blueprint
+# Docs: docs/render-hosting.md
+
+databases:
+  - name: skillplay-db
+    plan: starter
+    databaseName: skillplay
+    user: skillplay
+
+services:
+  # Code execution sandbox (private — not publicly accessible)
+  - type: pserv
+    name: skillplay-sandbox
+    runtime: docker
+    dockerfilePath: ./sandbox/Dockerfile
+    dockerContext: ./sandbox
+    plan: starter
+    envVars:
+      - key: PORT
+        value: 4001
+      - key: MEMORY_LIMIT_MB
+        value: 128
+
+  # Main API + Socket.IO
+  - type: web
+    name: skillplay-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: skillplay-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: skillplay-redis
+          property: connectionString
+      - key: SANDBOX_URL
+        fromService:
+          type: pserv
+          name: skillplay-sandbox
+          property: hostport
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: MOCK_PAYMENTS
+        value: "true"
+      - key: FREE_PLAYS_PER_TOPIC
+        value: "10"
+      - key: CORS_ORIGIN
+        sync: false
+
+  # Redis-compatible Key Value store
+  - type: keyvalue
+    name: skillplay-redis
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+  # Admin panel static site
+  - type: web
+    name: skillplay-admin
+    runtime: static
+    buildCommand: cd admin && npm install && npm run build
+    staticPublishPath: admin/dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: skillplay-api
+          envVarKey: RENDER_EXTERNAL_URL
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

@@ -1,6 +1,6 @@
 const express = require('express');
 const { execFile } = require('child_process');
-const { writeFile, mkdir, rm } = require('fs/promises');
+const { writeFile, mkdir, rm, readFile } = require('fs/promises');
 const { join } = require('path');
 const { randomUUID } = require('crypto');
 const os = require('os');
@@ -10,53 +10,78 @@ app.use(express.json({ limit: '512kb' }));
 
 const PORT = process.env.PORT || 4001;
 const WORK_DIR = join(os.tmpdir(), 'skillplay-sandbox');
+const MEMORY_LIMIT_MB = parseInt(process.env.MEMORY_LIMIT_MB || '128', 10);
 
 const RUNNERS = {
-  python: { ext: '.py', cmd: 'python', args: [] },
-  javascript: { ext: '.js', cmd: 'node', args: [] },
-  java: { ext: '.java', cmd: 'java', args: [] },
+  python: { ext: '.py' },
+  javascript: { ext: '.js' },
+  java: { ext: '.java', className: 'Solution' },
 };
 
-async function runPython(filePath, input, timeLimitMs) {
+function execWithLimit(cmd, args, opts = {}) {
+  const timeout = opts.timeout ?? 5000;
   return new Promise((resolve) => {
-    const proc = execFile('python', [filePath], { timeout: timeLimitMs }, (err, stdout, stderr) => {
+    const proc = execFile(cmd, args, {
+      timeout,
+      maxBuffer: MEMORY_LIMIT_MB * 1024 * 1024,
+      cwd: opts.cwd,
+      env: { ...process.env, ...opts.env },
+    }, (err, stdout, stderr) => {
       resolve({
         actual: stdout?.trim() ?? '',
         error: err ? (stderr || err.message) : undefined,
-        runtimeMs: 0,
       });
     });
-    if (input) proc.stdin?.write(input);
-    proc.stdin?.end();
+    if (opts.input != null) {
+      proc.stdin?.write(opts.input);
+      proc.stdin?.end();
+    }
   });
+}
+
+async function runPython(filePath, input, timeLimitMs) {
+  return execWithLimit('python3', [filePath], { input, timeout: timeLimitMs });
 }
 
 async function runJavaScript(filePath, input, timeLimitMs) {
-  const wrappedPath = filePath.replace('.js', '.wrapped.js');
-  const code = await require('fs/promises').readFile(filePath, 'utf8');
+  const code = await readFile(filePath, 'utf8');
   const wrapped = `
-const fs = require('fs');
 const input = ${JSON.stringify(input)};
 ${code}
-// Auto-invoke solve if exported
 if (typeof solve === 'function') {
   try {
     const arr = JSON.parse(input);
-    const result = solve(arr);
-    console.log(String(result));
-  } catch(e) { console.log(solve(input)); }
+    console.log(String(solve(arr)));
+  } catch(e) { console.log(String(solve(input))); }
 }
 `;
+  const wrappedPath = filePath.replace('.js', '.wrapped.js');
   await writeFile(wrappedPath, wrapped);
-  return new Promise((resolve) => {
-    execFile('node', [wrappedPath], { timeout: timeLimitMs }, (err, stdout, stderr) => {
-      resolve({
-        actual: stdout?.trim() ?? '',
-        error: err ? (stderr || err.message) : undefined,
-        runtimeMs: 0,
-      });
-    });
-  });
+  return execWithLimit('node', [wrappedPath], { timeout: timeLimitMs });
+}
+
+function wrapJavaCode(code) {
+  if (code.includes('class Solution')) return code;
+  return `import java.util.*;
+class Solution {
+  public static String solve(String input) throws Exception {
+    ${code}
+  }
+  public static void main(String[] args) throws Exception {
+    String data = new String(System.in.readAllBytes()).trim();
+    System.out.print(solve(data));
+  }
+}`;
+}
+
+async function runJava(jobDir, code, input, timeLimitMs) {
+  const sourcePath = join(jobDir, 'Solution.java');
+  await writeFile(sourcePath, wrapJavaCode(code));
+
+  const compile = await execWithLimit('javac', [sourcePath], { timeout: timeLimitMs, cwd: jobDir });
+  if (compile.error) return compile;
+
+  return execWithLimit('java', ['-cp', jobDir, 'Solution'], { input, timeout: timeLimitMs, cwd: jobDir });
 }
 
 function wrapPythonCode(code) {
@@ -66,7 +91,9 @@ import sys, json
 if __name__ == "__main__":
     data = sys.stdin.read().strip()
     try:
-        arr = json.loads(data) if data.startswith('[') else data
+        arr = json.loads(data) if data.startswith('[') or data.startswith('{') else data
+        if data.isdigit() or (data.startswith('-') and data[1:].isdigit()):
+            arr = int(data)
         result = solve(arr) if 'solve' in dir() else None
         print(result)
     except Exception as e:
@@ -89,10 +116,14 @@ app.post('/run', async (req, res) => {
 
   try {
     await mkdir(jobDir, { recursive: true });
-    const fileName = `solution${runner.ext}`;
+    const fileName = language === 'java' ? 'Solution.java' : `solution${runner.ext}`;
     const filePath = join(jobDir, fileName);
-    const finalCode = language === 'python' ? wrapPythonCode(code) : code;
-    await writeFile(filePath, finalCode);
+
+    if (language === 'python') {
+      await writeFile(filePath, wrapPythonCode(code));
+    } else if (language !== 'java') {
+      await writeFile(filePath, code);
+    }
 
     const results = [];
     const start = Date.now();
@@ -103,11 +134,13 @@ app.post('/run', async (req, res) => {
         result = await runPython(filePath, tc.input, timeLimitMs);
       } else if (language === 'javascript') {
         result = await runJavaScript(filePath, tc.input, timeLimitMs);
+      } else if (language === 'java') {
+        result = await runJava(jobDir, code, tc.input, timeLimitMs);
       } else {
-        result = { actual: '', error: 'Language runner not implemented in MVP' };
+        result = { actual: '', error: `Unsupported language: ${language}` };
       }
 
-      const passed = !result.error && result.actual === tc.expected;
+      const passed = !result.error && String(result.actual) === String(tc.expected);
       results.push({
         input: tc.input,
         expected: tc.expected,
@@ -121,6 +154,7 @@ app.post('/run', async (req, res) => {
       passed: results.every((r) => r.passed),
       results,
       totalRuntimeMs: Date.now() - start,
+      language,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -129,6 +163,10 @@ app.post('/run', async (req, res) => {
   }
 });
 
-app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'skillplay-sandbox' }));
+app.get('/health', (_req, res) => res.json({
+  status: 'ok',
+  service: 'skillplay-sandbox',
+  languages: Object.keys(RUNNERS),
+}));
 
 app.listen(PORT, () => console.log(`Sandbox running on http://localhost:${PORT}`));

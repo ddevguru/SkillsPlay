@@ -6,6 +6,7 @@ import { authenticate, requireSubscription, AuthRequest } from '../middleware/au
 import { validateBody } from '../middleware/validate.js';
 import { calculateLeaderboardPoints } from '../services/scoring.js';
 import { updateLeaderboardScore } from './leaderboard.js';
+import { emitRoomEvent } from '../lib/socket.js';
 
 const router = Router();
 
@@ -66,7 +67,22 @@ router.post('/join', authenticate, requireSubscription, validateBody(joinRoomSch
     include: { participants: { include: { user: { select: { id: true, name: true } } } } },
   });
 
+  emitRoomEvent(room.id, 'player:joined', {
+    userId,
+    participants: updated.participants.map((p) => ({ id: p.user.id, name: p.user.name })),
+  });
+
   res.json(updated);
+});
+
+router.get('/:roomId', authenticate, async (req: AuthRequest, res) => {
+  const roomId = pid(req.params.roomId);
+  const room = await prisma.multiplayerRoom.findUnique({
+    where: { id: roomId },
+    include: { participants: { include: { user: { select: { id: true, name: true } } } } },
+  });
+  if (!room) return res.status(404).json({ error: 'Room not found' });
+  res.json(room);
 });
 
 router.post('/:roomId/start', authenticate, async (req: AuthRequest, res) => {
@@ -83,6 +99,7 @@ router.post('/:roomId/start', authenticate, async (req: AuthRequest, res) => {
     where: { id: room.id },
     data: { status: RoomStatus.IN_PROGRESS, startedAt: new Date() },
   });
+  emitRoomEvent(room.id, 'room:started', { roomId: room.id, lessonId: room.lessonId, startedAt: updated.startedAt });
   res.json(updated);
 });
 
@@ -117,6 +134,8 @@ router.post('/:roomId/finish', authenticate, async (req: AuthRequest, res) => {
       data: { status: RoomStatus.COMPLETED, endedAt: new Date() },
     });
   });
+
+  emitRoomEvent(room.id, 'room:finished', { roomId: room.id, winners });
 
   res.json({ message: 'Match completed', winners });
 });

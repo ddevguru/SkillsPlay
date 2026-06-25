@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/providers.dart';
 import '../../models/models.dart';
 import '../../services/offline_cache.dart';
+import '../../widgets/games/game_types.dart';
+import '../../widgets/games/game_widget_factory.dart';
 
 class PlayScreen extends ConsumerStatefulWidget {
   final String lessonId;
@@ -17,14 +20,15 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
   String? _attemptId;
   Lesson? _lesson;
   int? _remainingPlays;
-  final _codeCtrl = TextEditingController();
-  final _answerCtrl = TextEditingController();
+  dynamic _answer;
+  String _code = '';
   bool _loading = true;
   bool _submitting = false;
   PlayResult? _result;
   String? _error;
   String? _blockReason;
   final _stopwatch = Stopwatch();
+  Timer? _timerTick;
 
   @override
   void initState() {
@@ -40,7 +44,13 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       _attemptId = data['attemptId'] as String;
       _lesson = Lesson.fromJson(data['lesson'] as Map<String, dynamic>);
       _remainingPlays = data['remainingFreePlays'] as int?;
+      _code = _lesson!.configJson['starterCode'] as String? ?? '';
       _stopwatch.start();
+      if (GameTypeId.fromString(_lesson!.gameType) == GameTypeId.timedChallenge) {
+        _timerTick = Timer.periodic(const Duration(seconds: 1), (_) {
+          if (mounted) setState(() {});
+        });
+      }
       await OfflineCache.cacheLesson(widget.lessonId, data['lesson'] as Map<String, dynamic>);
     } catch (e) {
       final msg = e.toString();
@@ -50,6 +60,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
         final cached = OfflineCache.getCachedLesson(widget.lessonId);
         if (cached != null) {
           _lesson = Lesson.fromJson(cached);
+          _code = _lesson!.configJson['starterCode'] as String? ?? '';
         } else {
           _error = 'Failed to start game';
         }
@@ -63,14 +74,15 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     if (_attemptId == null || _lesson == null) return;
     setState(() => _submitting = true);
     _stopwatch.stop();
+    _timerTick?.cancel();
     try {
       final api = ref.read(apiServiceProvider);
-      final isCode = _lesson!.gameType.contains('CODE') || _lesson!.gameType.contains('TIMED');
+      final type = GameTypeId.fromString(_lesson!.gameType);
       final data = await api.submitPlay(
         attemptId: _attemptId!,
-        answer: isCode ? null : _answerCtrl.text,
-        code: isCode ? _codeCtrl.text : null,
-        language: isCode ? (_lesson!.configJson['language'] as String? ?? 'python') : null,
+        answer: type.isCoding ? null : _answer,
+        code: type.isCoding ? _code : null,
+        language: type.isCoding ? (_lesson!.configJson['language'] as String? ?? 'python') : null,
         timeSeconds: _stopwatch.elapsed.inSeconds,
       );
       setState(() => _result = PlayResult.fromJson(data));
@@ -79,8 +91,8 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       await OfflineCache.queueAttempt({
         'attemptId': _attemptId,
         'lessonId': widget.lessonId,
-        'answer': _answerCtrl.text,
-        'code': _codeCtrl.text,
+        'answer': _answer,
+        'code': _code,
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -94,8 +106,7 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
 
   @override
   void dispose() {
-    _codeCtrl.dispose();
-    _answerCtrl.dispose();
+    _timerTick?.cancel();
     super.dispose();
   }
 
@@ -150,7 +161,6 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     }
 
     final lesson = _lesson!;
-    final isCode = lesson.gameType.contains('CODE') || lesson.gameType.contains('TIMED');
 
     return Scaffold(
       appBar: AppBar(
@@ -183,32 +193,24 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
                         Text('${lesson.points} pts'),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Text(lesson.content, style: Theme.of(context).textTheme.bodyLarge),
+                    if (!GameTypeId.fromString(lesson.gameType).isCoding &&
+                        lesson.gameType != 'MICRO_LESSON') ...[
+                      const SizedBox(height: 12),
+                      Text(lesson.content, style: Theme.of(context).textTheme.bodyLarge),
+                    ],
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            if (isCode) ...[
-              Text('Your Code', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _codeCtrl,
-                maxLines: 12,
-                decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
-                  hintText: lesson.configJson['starterCode'] as String? ?? 'Write your solution...',
-                ),
-              ),
-            ] else ...[
-              Text('Your Answer', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _answerCtrl,
-                decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'Enter answer'),
-              ),
-            ],
+            GameWidgetFactory(
+              lesson: lesson,
+              answer: _answer,
+              code: _code,
+              elapsedSeconds: _stopwatch.elapsed.inSeconds,
+              onAnswerChanged: (v) => setState(() => _answer = v),
+              onCodeChanged: (v) => setState(() => _code = v),
+            ),
             if (_error != null) ...[
               const SizedBox(height: 12),
               Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),

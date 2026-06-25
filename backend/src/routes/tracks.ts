@@ -8,14 +8,18 @@ import { cacheGet, cacheSet } from '../lib/redis.js';
 
 const router = Router();
 
-router.get('/', async (_req, res) => {
-  const cacheKey = 'tracks:all';
+router.get('/', async (req, res) => {
+  const includeTopics = req.query.include === 'topics';
+  const cacheKey = includeTopics ? 'tracks:all:topics' : 'tracks:all';
   const cached = await cacheGet<unknown>(cacheKey);
   if (cached) return res.json(cached);
 
   const tracks = await prisma.track.findMany({
     orderBy: { order: 'asc' },
-    include: { _count: { select: { topics: true } } },
+    include: {
+      _count: { select: { topics: true } },
+      ...(includeTopics ? { topics: { orderBy: { order: 'asc' }, select: { id: true, title: true, slug: true } } } : {}),
+    },
   });
 
   await cacheSet(cacheKey, tracks, 600);

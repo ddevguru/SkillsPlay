@@ -22,35 +22,65 @@ const TOPICS_BY_TRACK: Record<string, string[]> = {
 };
 
 function lessonContent(track: string, topic: string, idx: number) {
-  const isCode = idx % 3 === 2;
-  if (isCode) {
+  const patterns = idx % 6;
+  if (patterns === 2 || patterns === 5) {
+    const lang = track === 'java' ? 'java' : track === 'javascript' ? 'javascript' : 'python';
+    const starterCode =
+      lang === 'java'
+        ? 'String[] parts = input.replace("[","").replace("]","").split(",");\n    int sum = 0;\n    for (String p : parts) sum += Integer.parseInt(p.trim());\n    return String.valueOf(sum);'
+        : lang === 'javascript'
+          ? 'function solve(arr) {\n  return arr.reduce((a,b) => a+b, 0);\n}'
+          : 'def solve(arr):\n    return sum(arr)';
     return {
-      gameType: GameType.CODE_COMPLETION as GameType,
+      gameType: patterns === 5 ? GameType.TIMED_CHALLENGE : GameType.CODE_COMPLETION,
       content: `Complete the function for ${topic} in ${track}.`,
-      configJson: {
-        language: track === 'python' ? 'python' : track === 'javascript' ? 'javascript' : 'python',
-        starterCode: track === 'python' ? 'def solve(arr):\n    # your code\n    pass' : 'function solve(arr) {\n  // your code\n}',
-        timeLimitSeconds: 300,
-      },
+      configJson: { language: lang, starterCode, timeLimitSeconds: patterns === 5 ? 120 : 300 },
       testcases: [
         { input: '[1,2,3]', expectedOutput: '6' },
         { input: '[0]', expectedOutput: '0' },
       ],
     };
   }
-  if (idx % 3 === 1) {
+  if (patterns === 1) {
     return {
-      gameType: GameType.PUZZLE_REORDER as GameType,
+      gameType: GameType.PUZZLE_REORDER,
       content: `Reorder the steps for ${topic}.`,
       configJson: {
-        items: ['Step A', 'Step B', 'Step C', 'Step D'],
-        expectedAnswer: ['Step A', 'Step B', 'Step C', 'Step D'],
+        items: ['Analyze problem', 'Choose approach', 'Implement solution', 'Test & optimize'],
+        expectedAnswer: ['Analyze problem', 'Choose approach', 'Implement solution', 'Test & optimize'],
+        shuffleOnLoad: true,
+      },
+      testcases: [],
+    };
+  }
+  if (patterns === 3) {
+    return {
+      gameType: GameType.PUZZLE_DRAG_DROP,
+      content: `Match concepts to definitions for ${topic}.`,
+      configJson: {
+        items: ['Concept A', 'Concept B', 'Concept C'],
+        zones: ['Definition 1', 'Definition 2', 'Definition 3'],
+        expectedAnswer: { 'Definition 1': 'Concept A', 'Definition 2': 'Concept B', 'Definition 3': 'Concept C' },
+      },
+      testcases: [],
+    };
+  }
+  if (patterns === 4) {
+    return {
+      gameType: GameType.SCENARIO_SIMULATION,
+      content: `Solve a real-world ${topic} scenario.`,
+      configJson: {
+        steps: [
+          { prompt: `You encounter a ${topic} problem. What's your first step?`, options: ['Read docs', 'Guess', 'Ask AI'] },
+          { prompt: 'How do you verify your solution?', options: ['Unit tests', 'Ship it', 'Ignore'] },
+        ],
+        expectedAnswer: ['Read docs', 'Unit tests'],
       },
       testcases: [],
     };
   }
   return {
-    gameType: GameType.MICRO_LESSON as GameType,
+    gameType: GameType.MICRO_LESSON,
     content: `Learn the basics of ${topic} in ${track}.`,
     configJson: {
       slides: [
@@ -116,7 +146,7 @@ async function main() {
         },
       });
 
-      for (let k = 0; k < 3; k++) {
+      for (let k = 0; k < 6; k++) {
         const lc = lessonContent(t.slug, topicNames[j], k);
         const existing = await prisma.lesson.findFirst({
           where: { topicId: topic.id, order: k },

@@ -7,6 +7,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { prisma } from './lib/prisma.js';
 import { verifyAccessToken } from './lib/jwt.js';
+import { emitRoomEvent, setIo } from './lib/socket.js';
 import { errorHandler } from './middleware/validate.js';
 
 import authRoutes from './routes/auth.js';
@@ -90,7 +91,24 @@ io.on('connection', (socket) => {
       score: data.score,
     });
   });
+
+  socket.on('room:ready', (data: { roomId: string; ready: boolean }) => {
+    io.to(`room:${data.roomId}`).emit('player:ready', {
+      userId: socket.data.userId,
+      ready: data.ready,
+    });
+  });
+
+  socket.on('room:chat', (data: { roomId: string; message: string }) => {
+    io.to(`room:${data.roomId}`).emit('room:chat', {
+      userId: socket.data.userId,
+      message: data.message,
+      at: new Date().toISOString(),
+    });
+  });
 });
+
+setIo(io);
 
 async function main() {
   await prisma.$connect();

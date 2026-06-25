@@ -183,4 +183,19 @@ class ApiService {
     final res = await _dio.post('/rooms/join', data: {'roomCode': roomCode});
     return res.data;
   }
+
+  Future<Map<String, dynamic>> getRoom(String roomId) async {
+    final res = await _dio.get('/rooms/$roomId');
+    return res.data;
+  }
+
+  Future<Map<String, dynamic>> startRoom(String roomId) async {
+    final res = await _dio.post('/rooms/$roomId/start');
+    return res.data;
+  }
+
+  Future<Map<String, dynamic>> finishRoom(String roomId, Map<String, int> scores) async {
+    final res = await _dio.post('/rooms/$roomId/finish', data: {'scores': scores});
+    return res.data;
+  }
 }

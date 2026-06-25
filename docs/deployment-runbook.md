@@ -23,7 +23,15 @@
 
 ## Deploy Steps
 
-1. **Database**: Run `npx prisma migrate deploy` against production DB
+### Option A: Render (recommended)
+
+See [render-hosting.md](render-hosting.md) and root `render.yaml` blueprint.
+
+1. Connect GitHub repo to Render Blueprint
+2. Set `CORS_ORIGIN` to your admin + Flutter web URLs
+3. Run seed once via Render Shell: `cd backend && npm run db:seed`
+
+### Option B: AWS/GCP (manual)
 2. **Seed** (first deploy only): `npm run db:seed`
 3. **Backend**: Build Docker image, push to registry, deploy to ECS/EKS/Cloud Run
 4. **Sandbox**: Deploy as separate service with no external network access

@@ -11,6 +11,7 @@ import '../screens/play/play_screen.dart';
 import '../screens/leaderboard/leaderboard_screen.dart';
 import '../screens/subscription/subscription_screen.dart';
 import '../screens/multiplayer/multiplayer_screen.dart';
+import '../screens/multiplayer/multiplayer_room_screen.dart';
 import '../screens/profile/profile_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -47,6 +48,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/leaderboard', builder: (_, __) => const LeaderboardScreen()),
       GoRoute(path: '/subscription', builder: (_, __) => const SubscriptionScreen()),
       GoRoute(path: '/multiplayer', builder: (_, __) => const MultiplayerScreen()),
+      GoRoute(
+        path: '/multiplayer/room/:roomId',
+        builder: (_, state) => MultiplayerRoomScreen(roomId: state.pathParameters['roomId']!),
+      ),
       GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
     ],
   );

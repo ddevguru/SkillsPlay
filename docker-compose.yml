@@ -44,7 +44,7 @@ services:
       JWT_SECRET: dev-jwt-secret-change-in-production
       JWT_REFRESH_SECRET: dev-refresh-secret-change-in-production
       SANDBOX_URL: http://sandbox:4001
-      CORS_ORIGIN: http://localhost:8080,http://localhost:3001
+      CORS_ORIGIN: http://localhost:8080,http://localhost:3001,http://localhost:5173
       MOCK_PAYMENTS: "true"
       FREE_PLAYS_PER_TOPIC: "10"
     depends_on:
