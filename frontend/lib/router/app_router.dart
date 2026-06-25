@@ -27,7 +27,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isSplash = state.matchedLocation == '/';
 
       if (isLoading && isSplash) return null;
-      if (!isLoading && !isAuth && !isAuthRoute && !isSplash) return '/login';
+      if (!isLoading && !isAuth && !isAuthRoute) return '/login';
       if (!isLoading && isAuth && (isAuthRoute || isSplash)) return '/home';
       return null;
     },

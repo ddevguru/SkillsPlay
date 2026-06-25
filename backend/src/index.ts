@@ -22,7 +22,11 @@ const app = express();
 const httpServer = createServer(app);
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
-const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:8080').split(',');
+const corsOriginEnv = (process.env.CORS_ORIGIN || 'http://localhost:8080,http://localhost:5173').trim();
+const allowAllOrigins = corsOriginEnv === '*';
+const corsOrigins = allowAllOrigins
+  ? true
+  : corsOriginEnv.split(',').map((o) => o.trim()).filter(Boolean);
 
 app.use(helmet());
 app.use(cors({ origin: corsOrigins, credentials: true }));
@@ -51,7 +55,10 @@ app.use('/rooms', roomRoutes);
 app.use(errorHandler);
 
 const io = new Server(httpServer, {
-  cors: { origin: corsOrigins, credentials: true },
+  cors: {
+    origin: allowAllOrigins ? true : corsOrigins,
+    credentials: true,
+  },
   path: '/ws',
 });
 

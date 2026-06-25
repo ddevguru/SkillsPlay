@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// GCP VM backend — .env se override ho sakta hai (VITE_API_URL)
+const API_URL = import.meta.env.VITE_API_URL || 'http://35.200.216.188:3000';
 
 function getToken() {
   return localStorage.getItem('admin_token');

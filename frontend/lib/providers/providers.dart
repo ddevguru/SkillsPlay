@@ -15,15 +15,20 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
   }
 
   Future<void> _init() async {
-    await _api.loadTokens();
-    if (_api.isAuthenticated) {
-      try {
-        final data = await _api.getMe();
-        state = AsyncValue.data(User.fromJson(data));
-      } catch (_) {
+    try {
+      await _api.loadTokens();
+      if (_api.isAuthenticated) {
+        try {
+          final data = await _api.getMe();
+          state = AsyncValue.data(User.fromJson(data));
+        } catch (_) {
+          await _api.clearTokens();
+          state = const AsyncValue.data(null);
+        }
+      } else {
         state = const AsyncValue.data(null);
       }
-    } else {
+    } catch (_) {
       state = const AsyncValue.data(null);
     }
   }
