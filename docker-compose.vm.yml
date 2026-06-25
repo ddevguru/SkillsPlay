@@ -1,0 +1,74 @@
+# SkillPlay — GCP VM production stack (SSH deploy)
+# Usage: docker compose -f docker-compose.vm.yml --env-file gcp/vm/.env up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-skillplay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in gcp/vm/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-skillplay}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-skillplay}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - internal
+
+  sandbox:
+    build: ./sandbox
+    restart: unless-stopped
+    environment:
+      PORT: 4001
+      MEMORY_LIMIT_MB: 128
+    networks:
+      - internal
+    # Port NOT exposed publicly — only backend can reach via Docker network
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-skillplay}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-skillplay}?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET}
+      SANDBOX_URL: http://sandbox:4001
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      MOCK_PAYMENTS: ${MOCK_PAYMENTS:-true}
+      FREE_PLAYS_PER_TOPIC: ${FREE_PLAYS_PER_TOPIC:-10}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      sandbox:
+        condition: service_started
+    networks:
+      - internal
+
+volumes:
+  pgdata:
+
+networks:
+  internal:
+    driver: bridge

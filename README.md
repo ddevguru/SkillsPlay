@@ -139,15 +139,18 @@ k6 run load-tests/api-load.js   # requires k6 installed
 
 | Platform | Guide |
 |----------|-------|
-| **GCP (recommended)** | [docs/gcp-hosting.md](docs/gcp-hosting.md) — one-command deploy |
+| **GCP VM + SSH (simplest)** | [docs/gcp-vm-ssh.md](docs/gcp-vm-ssh.md) |
+| GCP Cloud Run (managed) | [docs/gcp-hosting.md](docs/gcp-hosting.md) |
 | Render | [docs/render-hosting.md](docs/render-hosting.md) |
 | General | [docs/deployment-runbook.md](docs/deployment-runbook.md) |
 
-### GCP quick deploy
+### GCP VM quick deploy (SSH)
 
-```powershell
-cd gcp\scripts
-.\deploy.ps1 -ProjectId "YOUR_GCP_PROJECT_ID" -RunSeed
+```bash
+# VM par SSH ke baad:
+cd /opt/skillplay
+chmod +x gcp/vm/*.sh
+bash gcp/vm/install.sh && bash gcp/vm/start.sh && bash gcp/vm/seed.sh
 ```
 
 ## Sprint Roadmap
