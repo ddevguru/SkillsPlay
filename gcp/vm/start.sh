@@ -35,3 +35,7 @@ docker compose -f docker-compose.vm.yml ps
 
 echo ""
 echo "API: http://$(curl -sf ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}'):${API_PORT:-3000}/health"
+
+echo ""
+echo ">>> Ek baar auto-start enable karo (reboot par khud chalega):"
+echo "    bash gcp/vm/enable-autostart.sh"

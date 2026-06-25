@@ -150,10 +150,79 @@ flutter run --dart-define=API_URL=http://VM_EXTERNAL_IP:3000 --dart-define=WS_UR
 
 ---
 
-## Roz ke commands (VM SSH par)
+## VM restart par auto-start (SSH bar bar nahi)
+
+**Ek baar** yeh chalao — uske baad VM reboot hone par backend **khud** start hoga:
 
 ```bash
-cd /opt/skillplay
+cd ~/SkillsPlay
+bash gcp/vm/enable-autostart.sh
+```
+
+`docker-compose.vm.yml` mein already `restart: unless-stopped` hai — container crash ho to bhi restart.  
+Systemd service VM **reboot** par sab uthata hai.
+
+Check (optional):
+```bash
+sudo systemctl status skillplay
+curl http://localhost:3000/health
+```
+
+---
+
+## Flutter APK — bina domain, sirf VM IP
+
+Tumhara external IP (screenshot se): **`35.200.216.188`**
+
+### 1. GCP Firewall — port 3000 khula ho
+
+Console → **VPC network** → **Firewall** → Create rule:
+- Direction: Ingress
+- Target: All instances (ya apni VM)
+- Source: `0.0.0.0/0`
+- Protocol: **TCP 3000**
+
+Ya phone browser se test: `http://35.200.216.188:3000/health`  
+`{"status":"ok"}` aana chahiye.
+
+### 2. APK build (apne Windows PC par)
+
+```powershell
+cd c:\skillplay\frontend
+.\build-apk.ps1 -ApiIp "35.200.216.188"
+```
+
+APK milega: `frontend\build\app\outputs\flutter-apk\app-release.apk`
+
+### 3. Manual build command
+
+```powershell
+flutter build apk --release `
+  --dart-define=API_URL=http://35.200.216.188:3000 `
+  --dart-define=WS_URL=http://35.200.216.188:3000
+```
+
+> Android par HTTP (HTTPS nahi) ke liye `usesCleartextTraffic` already enable hai.
+
+### IP badle to?
+
+Naya APK build karo same command se naye IP ke saath. Domain ki zaroorat nahi.
+
+---
+
+## Roz SSH ki zaroorat nahi
+
+| Kaam | Kab |
+|------|-----|
+| `install.sh` + `start.sh` + `seed.sh` | **Sirf ek baar** |
+| `enable-autostart.sh` | **Sirf ek baar** |
+| SSH / `start.sh` dubara | Sirf code update par (`bash gcp/vm/update.sh`) |
+| VM band / restart | Kuch nahi — backend apne aap chalega |
+
+## Optional — kabhi SSH karna ho (logs / update)
+
+```bash
+cd ~/SkillsPlay
 
 # Status dekho
 docker compose -f docker-compose.vm.yml ps
