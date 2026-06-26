@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../config/theme.dart';
 import '../../providers/providers.dart';
+import '../../widgets/clay/clay_widgets.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -39,50 +41,71 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return ClayScaffold(
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
+              constraints: const BoxConstraints(maxWidth: 420),
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(Icons.sports_esports, size: 64, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(height: 16),
-                    Text('Welcome back', style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
-                    const SizedBox(height: 32),
-                    TextFormField(
-                      controller: _emailCtrl,
-                      decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)),
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (v) => v != null && v.contains('@') ? null : 'Enter a valid email',
+                    ClayBox(
+                      color: SkillPlayTheme.primary.withValues(alpha: 0.12),
+                      padding: const EdgeInsets.all(28),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 72,
+                            height: 72,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(colors: [SkillPlayTheme.primary, SkillPlayTheme.accent]),
+                              borderRadius: BorderRadius.circular(22),
+                            ),
+                            child: const Icon(Icons.sports_esports, size: 40, color: Colors.white),
+                          ),
+                          const SizedBox(height: 16),
+                          Text('SkillPlay', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900)),
+                          Text('Learn. Play. Level Up.', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: SkillPlayTheme.clayTextMuted)),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passwordCtrl,
-                      decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outline)),
-                      obscureText: true,
-                      validator: (v) => v != null && v.length >= 8 ? null : 'Min 8 characters',
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 12),
-                      Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                    ],
                     const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _loading ? null : _login,
-                      child: _loading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Sign In'),
+                    ClayBox(
+                      inset: true,
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextFormField(
+                            controller: _emailCtrl,
+                            decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)),
+                            keyboardType: TextInputType.emailAddress,
+                            validator: (v) => v != null && v.contains('@') ? null : 'Enter a valid email',
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _passwordCtrl,
+                            decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outline)),
+                            obscureText: true,
+                            validator: (v) => v != null && v.length >= 8 ? null : 'Min 8 characters',
+                          ),
+                          if (_error != null) ...[
+                            const SizedBox(height: 12),
+                            Text(_error!, style: const TextStyle(color: Color(0xFFFF6B6B))),
+                          ],
+                          const SizedBox(height: 24),
+                          ClayButton(label: 'Sign In', icon: Icons.login, loading: _loading, onPressed: _loading ? null : _login),
+                          const SizedBox(height: 12),
+                          TextButton(onPressed: () => context.go('/signup'), child: const Text('Create an account')),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    TextButton(onPressed: () => context.go('/signup'), child: const Text('Create an account')),
-                    const SizedBox(height: 24),
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    Text('Demo: demo@skillplay.dev / Demo1234!', style: Theme.of(context).textTheme.bodySmall, textAlign: TextAlign.center),
+                    Text('Demo: demo@skillplay.dev / Demo1234!', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: SkillPlayTheme.clayTextMuted), textAlign: TextAlign.center),
                   ],
                 ),
               ),

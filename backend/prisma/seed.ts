@@ -1,5 +1,6 @@
-import { PrismaClient, UserRole, GameType, Difficulty } from '@prisma/client';
+import { PrismaClient, UserRole, Difficulty } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { buildLesson } from './lesson-content';
 
 const prisma = new PrismaClient();
 
@@ -20,79 +21,6 @@ const TOPICS_BY_TRACK: Record<string, string[]> = {
   python: ['Variables & Types', 'Control Flow', 'Functions', 'Lists & Dicts', 'OOP', 'File I/O', 'Decorators', 'Async', 'Testing', 'Packages'],
   javascript: ['Variables', 'Functions', 'Arrays', 'Objects', 'DOM', 'Promises', 'Async/Await', 'Modules', 'ES6+', 'Node Basics'],
 };
-
-function lessonContent(track: string, topic: string, idx: number) {
-  const patterns = idx % 6;
-  if (patterns === 2 || patterns === 5) {
-    const lang = track === 'java' ? 'java' : track === 'javascript' ? 'javascript' : 'python';
-    const starterCode =
-      lang === 'java'
-        ? 'String[] parts = input.replace("[","").replace("]","").split(",");\n    int sum = 0;\n    for (String p : parts) sum += Integer.parseInt(p.trim());\n    return String.valueOf(sum);'
-        : lang === 'javascript'
-          ? 'function solve(arr) {\n  return arr.reduce((a,b) => a+b, 0);\n}'
-          : 'def solve(arr):\n    return sum(arr)';
-    return {
-      gameType: patterns === 5 ? GameType.TIMED_CHALLENGE : GameType.CODE_COMPLETION,
-      content: `Complete the function for ${topic} in ${track}.`,
-      configJson: { language: lang, starterCode, timeLimitSeconds: patterns === 5 ? 120 : 300 },
-      testcases: [
-        { input: '[1,2,3]', expectedOutput: '6' },
-        { input: '[0]', expectedOutput: '0' },
-      ],
-    };
-  }
-  if (patterns === 1) {
-    return {
-      gameType: GameType.PUZZLE_REORDER,
-      content: `Reorder the steps for ${topic}.`,
-      configJson: {
-        items: ['Analyze problem', 'Choose approach', 'Implement solution', 'Test & optimize'],
-        expectedAnswer: ['Analyze problem', 'Choose approach', 'Implement solution', 'Test & optimize'],
-        shuffleOnLoad: true,
-      },
-      testcases: [],
-    };
-  }
-  if (patterns === 3) {
-    return {
-      gameType: GameType.PUZZLE_DRAG_DROP,
-      content: `Match concepts to definitions for ${topic}.`,
-      configJson: {
-        items: ['Concept A', 'Concept B', 'Concept C'],
-        zones: ['Definition 1', 'Definition 2', 'Definition 3'],
-        expectedAnswer: { 'Definition 1': 'Concept A', 'Definition 2': 'Concept B', 'Definition 3': 'Concept C' },
-      },
-      testcases: [],
-    };
-  }
-  if (patterns === 4) {
-    return {
-      gameType: GameType.SCENARIO_SIMULATION,
-      content: `Solve a real-world ${topic} scenario.`,
-      configJson: {
-        steps: [
-          { prompt: `You encounter a ${topic} problem. What's your first step?`, options: ['Read docs', 'Guess', 'Ask AI'] },
-          { prompt: 'How do you verify your solution?', options: ['Unit tests', 'Ship it', 'Ignore'] },
-        ],
-        expectedAnswer: ['Read docs', 'Unit tests'],
-      },
-      testcases: [],
-    };
-  }
-  return {
-    gameType: GameType.MICRO_LESSON,
-    content: `Learn the basics of ${topic} in ${track}.`,
-    configJson: {
-      slides: [
-        { title: `Intro to ${topic}`, body: 'Key concepts and definitions.' },
-        { title: 'Example', body: 'Walk through a simple example.' },
-      ],
-      quiz: { question: 'Ready to practice?', options: ['Yes'], expectedAnswer: 'Yes' },
-      expectedAnswer: 'Yes',
-    },
-    testcases: [],
-  };
-}
 
 async function main() {
   console.log('Seeding SkillPlay database...');
@@ -137,45 +65,58 @@ async function main() {
       const difficulty = j < 3 ? Difficulty.BASICS : j < 7 ? Difficulty.INTERMEDIATE : Difficulty.ADVANCED;
       const topic = await prisma.topic.upsert({
         where: { trackId_slug: { trackId: track.id, slug: topicNames[j].toLowerCase().replace(/\s+/g, '-') } },
-        update: {},
+        update: {
+          description: `🎮 ${topicNames[j]} — 6 fun games: quizzes, puzzles, scenarios & code challenges!`,
+        },
         create: {
           trackId: track.id,
           title: topicNames[j],
           slug: topicNames[j].toLowerCase().replace(/\s+/g, '-'),
-          description: `Practice ${topicNames[j]} with 6 interactive games — quizzes, puzzles, and coding challenges.`,
+          description: `🎮 ${topicNames[j]} — 6 fun games: quizzes, puzzles, scenarios & code challenges!`,
           difficulty,
           order: j,
         },
       });
 
       for (let k = 0; k < 6; k++) {
-        const lc = lessonContent(t.slug, topicNames[j], k);
+        const lc = buildLesson(t.slug, topicNames[j], k, difficulty);
         const existing = await prisma.lesson.findFirst({
           where: { topicId: topic.id, order: k },
         });
-        if (!existing) {
-          const lesson = await prisma.lesson.create({
+
+        const lessonData = {
+          title: lc.title,
+          gameType: lc.gameType,
+          difficulty,
+          configJson: lc.configJson,
+          content: lc.content,
+          points: 15 + k * 10,
+        };
+
+        let lessonId: string;
+        if (existing) {
+          const updated = await prisma.lesson.update({
+            where: { id: existing.id },
+            data: lessonData,
+          });
+          lessonId = updated.id;
+          await prisma.testcase.deleteMany({ where: { lessonId } });
+        } else {
+          const created = await prisma.lesson.create({
+            data: { ...lessonData, topicId: topic.id, order: k },
+          });
+          lessonId = created.id;
+        }
+
+        for (let tc = 0; tc < lc.testcases.length; tc++) {
+          await prisma.testcase.create({
             data: {
-              topicId: topic.id,
-              title: `${topicNames[j]} — Level ${k + 1}`,
-              gameType: lc.gameType,
-              difficulty,
-              configJson: lc.configJson,
-              content: lc.content,
-              points: 10 + k * 5,
-              order: k,
+              lessonId,
+              input: lc.testcases[tc].input,
+              expectedOutput: lc.testcases[tc].expectedOutput,
+              order: tc,
             },
           });
-          for (let tc = 0; tc < lc.testcases.length; tc++) {
-            await prisma.testcase.create({
-              data: {
-                lessonId: lesson.id,
-                input: lc.testcases[tc].input,
-                expectedOutput: lc.testcases[tc].expectedOutput,
-                order: tc,
-              },
-            });
-          }
         }
       }
     }

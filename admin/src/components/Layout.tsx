@@ -8,7 +8,7 @@ export default function Layout() {
     <div className="layout">
       <aside className="sidebar">
         <h1>SkillPlay</h1>
-        <p className="muted">Admin Panel</p>
+        <p className="muted">Admin Control Center</p>
         <nav>
           <NavLink to="/" end>Dashboard</NavLink>
           <NavLink to="/users">Users</NavLink>

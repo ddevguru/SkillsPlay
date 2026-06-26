@@ -13,7 +13,17 @@ fi
 cd "$APP_DIR"
 echo "Deploying from: $APP_DIR"
 
-git pull origin main 2>/dev/null || git pull 2>/dev/null || echo "No git remote — skipping pull"
+pull_latest() {
+  if git pull origin main 2>/dev/null; then return 0; fi
+  if git pull 2>/dev/null; then return 0; fi
+  return 1
+}
+
+if ! pull_latest; then
+  echo "Pull blocked by local changes — stashing and retrying..."
+  git stash push -u -m "skillplay-vm-deploy-$(date +%s)" || true
+  pull_latest || echo "Warning: could not pull latest code"
+fi
 
 docker compose -f docker-compose.vm.yml --env-file gcp/vm/.env up -d --build
 

@@ -1,4 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../config/theme.dart';
+import '../clay/clay_widgets.dart';
+
+String _itemLabel(dynamic e) {
+  if (e is Map) return (e['label'] ?? e['id'] ?? e).toString();
+  return e.toString();
+}
 
 class PuzzleDragDropWidget extends StatefulWidget {
   final Map<String, dynamic> config;
@@ -20,14 +27,14 @@ class _PuzzleDragDropWidgetState extends State<PuzzleDragDropWidget> {
 
   List<String> get _zones {
     final raw = widget.config['zones'] as List? ?? widget.config['targets'] as List? ?? [];
-    return raw.map((e) => e.toString()).toList();
+    return raw.map(_itemLabel).toList();
   }
 
   @override
   void initState() {
     super.initState();
     final raw = widget.config['items'] as List? ?? [];
-    _pool = raw.map((e) => e.toString()).toList();
+    _pool = raw.map(_itemLabel).toList();
     for (final z in _zones) {
       _zoneAssignments[z] = null;
     }
@@ -66,20 +73,23 @@ class _PuzzleDragDropWidgetState extends State<PuzzleDragDropWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Drag items into the correct zones', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 16),
+        Text('🎯 Match Maker', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 6),
+        Text('Drag each item into the correct zone', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: SkillPlayTheme.clayTextMuted)),
+        const SizedBox(height: 20),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: 10,
+          runSpacing: 10,
           children: _pool.map((item) {
             return Draggable<String>(
               data: item,
               feedback: Material(
-                elevation: 4,
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
+                color: Colors.transparent,
+                child: ClayBox(
+                  color: SkillPlayTheme.accent.withValues(alpha: 0.2),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: Text(item, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  depth: 1.5,
+                  child: Text(item, style: const TextStyle(fontWeight: FontWeight.w800)),
                 ),
               ),
               childWhenDragging: Opacity(opacity: 0.3, child: _chip(item)),
@@ -95,32 +105,36 @@ class _PuzzleDragDropWidgetState extends State<PuzzleDragDropWidget> {
             child: DragTarget<String>(
               onAcceptWithDetails: (d) => _assignToZone(zone, d.data),
               builder: (context, candidates, rejected) {
-                return Container(
-                  constraints: const BoxConstraints(minHeight: 64),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: candidates.isNotEmpty
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).dividerColor,
-                      width: candidates.isNotEmpty ? 2 : 1,
-                    ),
-                    color: candidates.isNotEmpty
-                        ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
-                        : null,
-                  ),
+                return ClayBox(
+                  inset: candidates.isEmpty,
+                  color: candidates.isNotEmpty
+                      ? SkillPlayTheme.primary.withValues(alpha: 0.12)
+                      : SkillPlayTheme.claySurface,
+                  padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      Expanded(child: Text(zone, style: Theme.of(context).textTheme.titleSmall)),
+                      Expanded(child: Text(zone, style: const TextStyle(fontWeight: FontWeight.w700))),
                       if (assigned != null)
-                        ActionChip(
-                          label: Text(assigned),
-                          onPressed: () => _returnToPool(assigned),
-                          avatar: const Icon(Icons.close, size: 16),
+                        GestureDetector(
+                          onTap: () => _returnToPool(assigned),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: SkillPlayTheme.secondary.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(assigned, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.close, size: 14),
+                              ],
+                            ),
+                          ),
                         )
                       else
-                        Text('Drop here', style: Theme.of(context).textTheme.bodySmall),
+                        Text('Drop here', style: TextStyle(color: SkillPlayTheme.clayTextMuted, fontSize: 13)),
                     ],
                   ),
                 );
@@ -133,6 +147,18 @@ class _PuzzleDragDropWidgetState extends State<PuzzleDragDropWidget> {
   }
 
   Widget _chip(String item) {
-    return Chip(label: Text(item), avatar: const Icon(Icons.drag_indicator, size: 18));
+    return ClayBox(
+      color: SkillPlayTheme.accent.withValues(alpha: 0.12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      depth: 0.7,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.drag_indicator, size: 18, color: SkillPlayTheme.accent),
+          const SizedBox(width: 6),
+          Text(item, style: const TextStyle(fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
   }
 }

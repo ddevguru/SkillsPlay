@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../config/theme.dart';
+import '../clay/clay_widgets.dart';
 
 class CodeChallengeWidget extends StatefulWidget {
   final Map<String, dynamic> config;
@@ -42,6 +44,8 @@ class _CodeChallengeWidgetState extends State<CodeChallengeWidget> {
   Widget build(BuildContext context) {
     final language = widget.config['language'] as String? ?? 'python';
     final timeLimit = widget.config['timeLimitSeconds'] as int? ?? 300;
+    final accent = widget.timed ? const Color(0xFFFF6B6B) : SkillPlayTheme.secondary;
+    final timeRatio = (widget.elapsedSeconds / timeLimit).clamp(0.0, 1.0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -49,21 +53,39 @@ class _CodeChallengeWidgetState extends State<CodeChallengeWidget> {
         if (widget.timed) ...[
           Row(
             children: [
-              const Icon(Icons.timer, size: 18),
+              const Text('⚡', style: TextStyle(fontSize: 18)),
               const SizedBox(width: 6),
-              Text('${widget.elapsedSeconds}s / ${timeLimit}s'),
+              Text('${widget.elapsedSeconds}s / ${timeLimit}s', style: TextStyle(fontWeight: FontWeight.w800, color: accent)),
               const Spacer(),
-              LinearProgressIndicator(
-                value: (widget.elapsedSeconds / timeLimit).clamp(0.0, 1.0),
-                minHeight: 6,
-              ),
+              Text('${(timeRatio * 100).toInt()}%', style: TextStyle(color: SkillPlayTheme.clayTextMuted, fontSize: 12)),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: timeRatio,
+              minHeight: 8,
+              color: timeRatio > 0.8 ? const Color(0xFFFF6B6B) : accent,
+              backgroundColor: accent.withValues(alpha: 0.15),
+            ),
+          ),
+          const SizedBox(height: 16),
         ],
         Row(
           children: [
-            Chip(label: Text(language.toUpperCase()), avatar: const Icon(Icons.code, size: 16)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: accent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(10)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.code, size: 14, color: accent),
+                  const SizedBox(width: 4),
+                  Text(language.toUpperCase(), style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: accent)),
+                ],
+              ),
+            ),
             const Spacer(),
             TextButton.icon(
               onPressed: () {
@@ -75,15 +97,19 @@ class _CodeChallengeWidgetState extends State<CodeChallengeWidget> {
           ],
         ),
         const SizedBox(height: 8),
-        TextField(
-          controller: _controller,
-          maxLines: 16,
-          style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-          decoration: InputDecoration(
-            border: const OutlineInputBorder(),
-            hintText: 'Write your $language solution...',
-            filled: true,
-            fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        ClayBox(
+          inset: true,
+          padding: const EdgeInsets.all(4),
+          child: TextField(
+            controller: _controller,
+            maxLines: 16,
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              hintText: 'Write your $language solution...',
+              filled: false,
+              contentPadding: const EdgeInsets.all(14),
+            ),
           ),
         ),
       ],

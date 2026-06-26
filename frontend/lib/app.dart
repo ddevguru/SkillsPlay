@@ -13,8 +13,8 @@ class SkillPlayApp extends ConsumerWidget {
       title: 'SkillPlay',
       debugShowCheckedModeBanner: false,
       theme: SkillPlayTheme.light,
-      darkTheme: SkillPlayTheme.dark,
-      themeMode: ThemeMode.system,
+      darkTheme: SkillPlayTheme.light,
+      themeMode: ThemeMode.light,
       routerConfig: router,
     );
   }

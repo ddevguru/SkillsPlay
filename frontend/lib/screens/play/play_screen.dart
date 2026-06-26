@@ -2,10 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../config/theme.dart';
 import '../../providers/socket_provider.dart';
 import '../../providers/providers.dart';
 import '../../models/models.dart';
 import '../../services/offline_cache.dart';
+import '../../widgets/clay/clay_widgets.dart';
 import '../../widgets/games/game_types.dart';
 import '../../widgets/games/game_widget_factory.dart';
 
@@ -120,28 +122,32 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     super.dispose();
   }
 
+  Color get _gameColor => SkillPlayTheme.gameColors[_lesson?.gameType] ?? SkillPlayTheme.primary;
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const ClayScaffold(body: Center(child: CircularProgressIndicator(color: SkillPlayTheme.primary)));
     }
 
     if (_blockReason != null) {
-      return Scaffold(
-        appBar: AppBar(),
+      return ClayScaffold(
+        appBar: const ClayAppBar(title: 'Locked'),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.lock, size: 64, color: Colors.orange),
-                const SizedBox(height: 16),
-                Text(_blockReason!, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 24),
-                FilledButton(onPressed: () => context.push('/subscription'), child: const Text('View Plans')),
-                TextButton(onPressed: () => context.pop(), child: const Text('Go Back')),
-              ],
+            child: ClayBox(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.lock_rounded, size: 64, color: Color(0xFFFFB347)),
+                  const SizedBox(height: 16),
+                  Text(_blockReason!, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 24),
+                  ClayButton(label: 'View Plans', icon: Icons.star, onPressed: () => context.push('/subscription')),
+                  TextButton(onPressed: () => context.pop(), child: const Text('Go Back')),
+                ],
+              ),
             ),
           ),
         ),
@@ -149,28 +155,33 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
     }
 
     if (_result != null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Results')),
+      final passed = _result!.passed;
+      return ClayScaffold(
+        appBar: const ClayAppBar(title: 'Results'),
         body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(_result!.passed ? Icons.celebration : Icons.replay, size: 80,
-                  color: _result!.passed ? Colors.green : Colors.orange),
-              const SizedBox(height: 16),
-              Text(_result!.passed ? 'Victory!' : 'Keep practicing!',
-                  style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 8),
-              Text('Score: ${_result!.score} · XP: +${_result!.xpEarned}'),
-              const SizedBox(height: 24),
-              if (widget.roomId != null)
-                FilledButton(
-                  onPressed: () => context.go('/multiplayer/room/${widget.roomId}'),
-                  child: const Text('Back to Room'),
-                )
-              else
-                FilledButton(onPressed: () => context.pop(), child: const Text('Continue')),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: ClayBox(
+              color: passed ? const Color(0xFF6BCB77).withValues(alpha: 0.12) : const Color(0xFFFFB347).withValues(alpha: 0.12),
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(passed ? '🎉' : '💪', style: const TextStyle(fontSize: 64)),
+                  const SizedBox(height: 12),
+                  Text(passed ? 'Victory!' : 'Almost there!',
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 8),
+                  Text('Score: ${_result!.score} · XP: +${_result!.xpEarned}',
+                      style: TextStyle(color: SkillPlayTheme.clayTextMuted, fontSize: 16)),
+                  const SizedBox(height: 28),
+                  if (widget.roomId != null)
+                    ClayButton(label: 'Back to Room', onPressed: () => context.go('/multiplayer/room/${widget.roomId}'))
+                  else
+                    ClayButton(label: 'Continue', icon: Icons.arrow_forward, onPressed: () => context.pop()),
+                ],
+              ),
+            ),
           ),
         ),
       );
@@ -178,65 +189,85 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
 
     final lesson = _lesson!;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(lesson.title),
+    return ClayScaffold(
+      appBar: ClayAppBar(
+        title: lesson.title,
         actions: [
           if (_remainingPlays != null)
             Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Chip(label: Text('$_remainingPlays free plays')),
+              padding: const EdgeInsets.only(right: 12),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _gameColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text('$_remainingPlays free', style: TextStyle(fontWeight: FontWeight.w700, color: _gameColor, fontSize: 12)),
+                ),
+              ),
             ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Chip(label: Text(lesson.gameType.replaceAll('_', ' '))),
-                        const SizedBox(width: 8),
-                        Chip(label: Text(lesson.difficulty)),
-                        const Spacer(),
-                        Text('${lesson.points} pts'),
-                      ],
-                    ),
-                    if (!GameTypeId.fromString(lesson.gameType).isCoding &&
-                        lesson.gameType != 'MICRO_LESSON') ...[
-                      const SizedBox(height: 12),
-                      Text(lesson.content, style: Theme.of(context).textTheme.bodyLarge),
+            ClayBox(
+              color: _gameColor.withValues(alpha: 0.08),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: _gameColor.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(10)),
+                        child: Text(lesson.gameType.replaceAll('_', ' '), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _gameColor)),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: SkillPlayTheme.clayTextMuted.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
+                        child: Text(lesson.difficulty, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                      ),
+                      const Spacer(),
+                      Text('${lesson.points} pts', style: TextStyle(fontWeight: FontWeight.w800, color: _gameColor)),
                     ],
+                  ),
+                  if (!GameTypeId.fromString(lesson.gameType).isCoding &&
+                      lesson.gameType != 'MICRO_LESSON') ...[
+                    const SizedBox(height: 14),
+                    Text(lesson.content, style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5)),
                   ],
-                ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            GameWidgetFactory(
-              lesson: lesson,
-              answer: _answer,
-              code: _code,
-              elapsedSeconds: _stopwatch.elapsed.inSeconds,
-              onAnswerChanged: (v) => setState(() => _answer = v),
-              onCodeChanged: (v) => setState(() => _code = v),
+            const SizedBox(height: 20),
+            ClayBox(
+              inset: true,
+              padding: const EdgeInsets.all(20),
+              child: GameWidgetFactory(
+                lesson: lesson,
+                answer: _answer,
+                code: _code,
+                elapsedSeconds: _stopwatch.elapsed.inSeconds,
+                onAnswerChanged: (v) => setState(() => _answer = v),
+                onCodeChanged: (v) => setState(() => _code = v),
+              ),
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(_error!, style: const TextStyle(color: Color(0xFFFF6B6B))),
             ],
             const SizedBox(height: 24),
-            FilledButton(
+            ClayButton(
+              label: _submitting ? 'Submitting...' : 'Submit Answer',
+              icon: Icons.check_circle_outline,
+              color: _gameColor,
+              loading: _submitting,
               onPressed: _submitting ? null : _submit,
-              child: _submitting
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Submit'),
             ),
           ],
         ),
