@@ -12,7 +12,7 @@ class TopicScreen extends ConsumerWidget {
     final topicsAsync = ref.watch(topicsProvider(trackId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Topics')),
+      appBar: AppBar(title: const Text('Topics & Games')),
       body: topicsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
@@ -22,13 +22,34 @@ class TopicScreen extends ConsumerWidget {
           itemBuilder: (_, i) {
             final topic = topics[i];
             return Card(
-              child: ExpansionTile(
-                leading: _difficultyIcon(topic.difficulty),
-                title: Text(topic.title),
-                subtitle: Text('${topic.lessonCount} lessons · ${topic.difficulty}'),
-                children: [
-                  _LessonList(trackId: trackId, topicId: topic.id),
-                ],
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        _difficultyIcon(topic.difficulty),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(topic.title, style: Theme.of(context).textTheme.titleMedium),
+                        ),
+                        Chip(
+                          label: Text('${topic.lessonCount} games'),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                    if (topic.description.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(topic.description, style: Theme.of(context).textTheme.bodyMedium),
+                    ],
+                    const SizedBox(height: 8),
+                    const Text('Tap a game to play:', style: TextStyle(fontWeight: FontWeight.w600)),
+                    _LessonList(trackId: trackId, topicId: topic.id),
+                  ],
+                ),
               ),
             );
           },
@@ -60,21 +81,51 @@ class _LessonList extends ConsumerWidget {
       future: ref.read(apiServiceProvider).getTopicLessons(trackId, topicId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator());
+          return const Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator());
         }
         if (snapshot.hasError || !snapshot.hasData) {
-          return const Padding(padding: EdgeInsets.all(16), child: Text('Failed to load lessons'));
+          return const Padding(padding: EdgeInsets.all(8), child: Text('Failed to load games'));
         }
         final lessons = snapshot.data!;
+        if (lessons.isEmpty) {
+          return const Padding(padding: EdgeInsets.all(8), child: Text('No games yet — admin can add from panel'));
+        }
         return Column(
-          children: lessons.map((l) => ListTile(
-            title: Text(l['title'] as String),
-            subtitle: Text('${l['gameType']} · ${l['points']} pts'),
-            trailing: const Icon(Icons.play_arrow),
-            onTap: () => context.push('/play/${l['id']}'),
-          )).toList(),
+          children: lessons.map((l) {
+            final gameType = l['gameType'] as String;
+            return Card(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: ListTile(
+                leading: Icon(_gameIcon(gameType), color: Theme.of(context).colorScheme.primary),
+                title: Text(l['title'] as String),
+                subtitle: Text('${_gameLabel(gameType)} · ${l['points']} pts'),
+                trailing: const Icon(Icons.play_circle_fill),
+                onTap: () => context.push('/play/${l['id']}'),
+              ),
+            );
+          }).toList(),
         );
       },
     );
   }
+
+  IconData _gameIcon(String type) => switch (type) {
+        'MICRO_LESSON' => Icons.quiz,
+        'PUZZLE_DRAG_DROP' => Icons.drag_indicator,
+        'PUZZLE_REORDER' => Icons.reorder,
+        'CODE_COMPLETION' => Icons.code,
+        'TIMED_CHALLENGE' => Icons.timer,
+        'SCENARIO_SIMULATION' => Icons.psychology,
+        _ => Icons.videogame_asset,
+      };
+
+  String _gameLabel(String type) => switch (type) {
+        'MICRO_LESSON' => 'Quiz',
+        'PUZZLE_DRAG_DROP' => 'Drag & Drop',
+        'PUZZLE_REORDER' => 'Reorder',
+        'CODE_COMPLETION' => 'Code',
+        'TIMED_CHALLENGE' => 'Timed Code',
+        'SCENARIO_SIMULATION' => 'Scenario',
+        _ => type,
+      };
 }

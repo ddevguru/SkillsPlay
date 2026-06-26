@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -48,7 +49,7 @@ class _MultiplayerRoomScreenState extends ConsumerState<MultiplayerRoomScreen> {
 
     socket.on('player:joined', (data) {
       if (mounted) {
-        setState(() => _statusMessage = 'Player joined the room');
+        setState(() => _statusMessage = 'Friend joined! Share code if they need it.');
         _loadRoom(silent: true);
       }
     });
@@ -69,13 +70,13 @@ class _MultiplayerRoomScreenState extends ConsumerState<MultiplayerRoomScreen> {
       if (mounted) {
         setState(() {
           _playerScores[map['userId']] = (map['score'] as num?)?.toInt() ?? 0;
-          _statusMessage = 'Opponent submitted!';
+          _statusMessage = 'Opponent finished the game!';
         });
       }
     });
     socket.on('room:started', (_) {
       if (mounted) {
-        setState(() => _statusMessage = 'Match started!');
+        setState(() => _statusMessage = 'Match started — play the challenge!');
         _loadRoom(silent: true);
       }
     });
@@ -116,14 +117,20 @@ class _MultiplayerRoomScreenState extends ConsumerState<MultiplayerRoomScreen> {
     }
   }
 
-  Future<void> _submitDemoScore() async {
-    const score = 85;
-    ref.read(socketServiceProvider).submitScore(widget.roomId, score);
-    setState(() => _playerScores[_myUserId ?? ''] = score);
-    try {
-      await ref.read(apiServiceProvider).finishRoom(widget.roomId, {_myUserId!: score});
-      await _loadRoom(silent: true);
-    } catch (_) {}
+  Future<void> _copyCode(String code) async {
+    await Clipboard.setData(ClipboardData(text: code));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Room code copied — WhatsApp pe bhejo!')));
+    }
+  }
+
+  void _playChallenge() {
+    final lessonId = _room?['lessonId'] as String?;
+    if (lessonId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No game selected for this room')));
+      return;
+    }
+    context.push('/play/$lessonId?roomId=${widget.roomId}');
   }
 
   String? get _myUserId => ref.read(authStateProvider).valueOrNull?.id;
@@ -154,6 +161,7 @@ class _MultiplayerRoomScreenState extends ConsumerState<MultiplayerRoomScreen> {
     final participants = (_room!['participants'] as List?) ?? [];
     final status = _room!['status'] as String? ?? 'WAITING';
     final roomCode = _room!['roomCode'] as String? ?? '';
+    final lessonId = _room!['lessonId'] as String?;
 
     return Scaffold(
       appBar: AppBar(title: Text('Room $roomCode')),
@@ -161,12 +169,31 @@ class _MultiplayerRoomScreenState extends ConsumerState<MultiplayerRoomScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           Card(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            child: ListTile(
+              title: const Text('Share with friend'),
+              subtitle: Text('Code: $roomCode', style: Theme.of(context).textTheme.headlineSmall),
+              trailing: IconButton(
+                icon: const Icon(Icons.copy),
+                onPressed: () => _copyCode(roomCode),
+              ),
+            ),
+          ),
+          Card(
             child: ListTile(
               leading: Icon(status == 'IN_PROGRESS' ? Icons.play_circle : Icons.hourglass_empty),
               title: Text('Status: $status'),
-              subtitle: Text(_statusMessage ?? 'Waiting for players...'),
+              subtitle: Text(_statusMessage ?? 'Waiting for friend to join...'),
             ),
           ),
+          if (lessonId != null)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.videogame_asset),
+                title: const Text('Game Challenge'),
+                subtitle: const Text('Both players will play the same game — highest score wins'),
+              ),
+            ),
           const SizedBox(height: 16),
           Text('Players (${participants.length}/${_room!['maxPlayers'] ?? 2})',
               style: Theme.of(context).textTheme.titleMedium),
@@ -181,8 +208,7 @@ class _MultiplayerRoomScreenState extends ConsumerState<MultiplayerRoomScreen> {
                 title: Text(isMe ? '$name (you)' : name),
                 subtitle: Text(
                   'Ready: ${_playerReady[uid] == true ? 'Yes' : 'No'} · '
-                  'Progress: ${_playerProgress[uid] ?? 0}% · '
-                  'Score: ${_playerScores[uid] ?? p['score'] ?? 0}',
+                  'Score: ${_playerScores[uid] ?? p['score'] ?? '-'}',
                 ),
                 trailing: p['isWinner'] == true ? const Icon(Icons.emoji_events, color: Colors.amber) : null,
               ),
@@ -191,22 +217,22 @@ class _MultiplayerRoomScreenState extends ConsumerState<MultiplayerRoomScreen> {
           const SizedBox(height: 24),
           if (status == 'WAITING') ...[
             if (_isHost && participants.length >= 2)
-              FilledButton(onPressed: _startMatch, child: const Text('Start Match'))
+              FilledButton(onPressed: _startMatch, child: const Text('Start Game'))
             else if (_isHost)
-              const Text('Waiting for opponent to join...', textAlign: TextAlign.center),
+              const Text('Share room code — waiting for friend to join...', textAlign: TextAlign.center),
             OutlinedButton(
               onPressed: _toggleReady,
               child: Text(_ready ? 'Not Ready' : 'Ready Up'),
             ),
           ],
           if (status == 'IN_PROGRESS') ...[
-            FilledButton(
-              onPressed: () {
-                ref.read(socketServiceProvider).sendProgress(widget.roomId, 50);
-                _submitDemoScore();
-              },
-              child: const Text('Submit Score (Demo)'),
+            FilledButton.icon(
+              onPressed: lessonId != null ? _playChallenge : null,
+              icon: const Icon(Icons.sports_esports),
+              label: const Text('Play Challenge Now'),
             ),
+            const SizedBox(height: 8),
+            const Text('Complete the game — your score is sent automatically', textAlign: TextAlign.center),
           ],
           if (status == 'COMPLETED')
             FilledButton(onPressed: () => context.go('/leaderboard'), child: const Text('View Leaderboard')),

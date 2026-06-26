@@ -61,7 +61,7 @@ class HomeScreen extends ConsumerWidget {
               children: [
                 _ActionChip(icon: Icons.add_road, label: 'Add Tracks', onTap: () => context.push('/tracks/select')),
                 _ActionChip(icon: Icons.leaderboard, label: 'Leaderboard', onTap: () => context.push('/leaderboard')),
-                _ActionChip(icon: Icons.groups, label: 'Multiplayer', onTap: () => context.push('/multiplayer')),
+                _ActionChip(icon: Icons.groups, label: 'Play with Friends', onTap: () => context.push('/multiplayer')),
                 if (user != null && !user.hasSubscription)
                   _ActionChip(icon: Icons.star, label: 'Subscribe', onTap: () => context.push('/subscription')),
               ],

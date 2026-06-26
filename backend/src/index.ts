@@ -24,12 +24,27 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 
 const corsOriginEnv = (process.env.CORS_ORIGIN || 'http://localhost:8080,http://localhost:5173').trim();
 const allowAllOrigins = corsOriginEnv === '*';
-const corsOrigins = allowAllOrigins
-  ? true
+const allowedOriginList = allowAllOrigins
+  ? []
   : corsOriginEnv.split(',').map((o) => o.trim()).filter(Boolean);
 
-app.use(helmet());
-app.use(cors({ origin: corsOrigins, credentials: true }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowAllOrigins || allowedOriginList.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked: ${origin}`));
+      }
+    },
+    credentials: true,
+  })
+);
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 app.use(express.json({ limit: '1mb' }));
 app.use(
   rateLimit({
@@ -56,7 +71,13 @@ app.use(errorHandler);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: allowAllOrigins ? true : corsOrigins,
+    origin(origin, callback) {
+      if (!origin || allowAllOrigins || allowedOriginList.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked: ${origin}`));
+      }
+    },
     credentials: true,
   },
   path: '/ws',

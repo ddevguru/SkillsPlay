@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/socket_provider.dart';
 import '../../providers/providers.dart';
 import '../../models/models.dart';
 import '../../services/offline_cache.dart';
@@ -10,7 +11,8 @@ import '../../widgets/games/game_widget_factory.dart';
 
 class PlayScreen extends ConsumerStatefulWidget {
   final String lessonId;
-  const PlayScreen({super.key, required this.lessonId});
+  final String? roomId;
+  const PlayScreen({super.key, required this.lessonId, this.roomId});
 
   @override
   ConsumerState<PlayScreen> createState() => _PlayScreenState();
@@ -87,6 +89,14 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
       );
       setState(() => _result = PlayResult.fromJson(data));
       ref.read(authStateProvider.notifier).refresh();
+      if (widget.roomId != null) {
+        final uid = ref.read(authStateProvider).valueOrNull?.id;
+        final score = _result!.score;
+        if (uid != null) {
+          ref.read(socketServiceProvider).submitScore(widget.roomId!, score);
+          await api.finishRoom(widget.roomId!, {uid: score});
+        }
+      }
     } catch (e) {
       await OfflineCache.queueAttempt({
         'attemptId': _attemptId,
@@ -153,7 +163,13 @@ class _PlayScreenState extends ConsumerState<PlayScreen> {
               const SizedBox(height: 8),
               Text('Score: ${_result!.score} · XP: +${_result!.xpEarned}'),
               const SizedBox(height: 24),
-              FilledButton(onPressed: () => context.pop(), child: const Text('Continue')),
+              if (widget.roomId != null)
+                FilledButton(
+                  onPressed: () => context.go('/multiplayer/room/${widget.roomId}'),
+                  child: const Text('Back to Room'),
+                )
+              else
+                FilledButton(onPressed: () => context.pop(), child: const Text('Continue')),
             ],
           ),
         ),

@@ -43,7 +43,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/play/:lessonId',
-        builder: (_, state) => PlayScreen(lessonId: state.pathParameters['lessonId']!),
+        builder: (_, state) => PlayScreen(
+          lessonId: state.pathParameters['lessonId']!,
+          roomId: state.uri.queryParameters['roomId'],
+        ),
       ),
       GoRoute(path: '/leaderboard', builder: (_, __) => const LeaderboardScreen()),
       GoRoute(path: '/subscription', builder: (_, __) => const SubscriptionScreen()),

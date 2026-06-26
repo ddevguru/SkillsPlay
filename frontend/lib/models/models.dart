@@ -62,6 +62,7 @@ class Topic {
   final String title;
   final String slug;
   final String difficulty;
+  final String description;
   final int lessonCount;
 
   Topic({
@@ -69,6 +70,7 @@ class Topic {
     required this.title,
     required this.slug,
     required this.difficulty,
+    this.description = '',
     this.lessonCount = 0,
   });
 
@@ -77,6 +79,7 @@ class Topic {
         title: json['title'] as String,
         slug: json['slug'] as String,
         difficulty: json['difficulty'] as String,
+        description: json['description'] as String? ?? '',
         lessonCount: json['_count']?['lessons'] as int? ?? 0,
       );
 }

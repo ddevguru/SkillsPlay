@@ -114,12 +114,13 @@ async function main() {
 
   const demo = await prisma.user.upsert({
     where: { email: 'demo@skillplay.dev' },
-    update: {},
+    update: { subscriptionStatus: 'BASIC' },
     create: {
       name: 'Demo Player',
       email: 'demo@skillplay.dev',
       hashedPassword: demoHash,
       xp: 150,
+      subscriptionStatus: 'BASIC',
     },
   });
 
@@ -141,6 +142,7 @@ async function main() {
           trackId: track.id,
           title: topicNames[j],
           slug: topicNames[j].toLowerCase().replace(/\s+/g, '-'),
+          description: `Practice ${topicNames[j]} with 6 interactive games — quizzes, puzzles, and coding challenges.`,
           difficulty,
           order: j,
         },

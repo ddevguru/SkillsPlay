@@ -18,12 +18,27 @@ router.get('/', async (req, res) => {
     orderBy: { order: 'asc' },
     include: {
       _count: { select: { topics: true } },
-      ...(includeTopics ? { topics: { orderBy: { order: 'asc' }, select: { id: true, title: true, slug: true } } } : {}),
+      ...(includeTopics ? { topics: { orderBy: { order: 'asc' }, select: { id: true, title: true, slug: true, description: true } } } : {}),
     },
   });
 
   await cacheSet(cacheKey, tracks, 600);
   res.json(tracks);
+});
+
+router.get('/playable-lessons', async (_req, res) => {
+  const lessons = await prisma.lesson.findMany({
+    orderBy: [{ topic: { track: { order: 'asc' } } }, { topic: { order: 'asc' } }, { order: 'asc' }],
+    take: 100,
+    select: {
+      id: true,
+      title: true,
+      gameType: true,
+      points: true,
+      topic: { select: { title: true, track: { select: { title: true } } } },
+    },
+  });
+  res.json(lessons);
 });
 
 router.get('/lessons/:id', authenticate, async (req: AuthRequest, res) => {
@@ -65,7 +80,15 @@ router.get('/:id/topics', async (req, res) => {
   const topics = await prisma.topic.findMany({
     where: { trackId: req.params.id },
     orderBy: { order: 'asc' },
-    include: { _count: { select: { lessons: true } } },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      description: true,
+      difficulty: true,
+      order: true,
+      _count: { select: { lessons: true } },
+    },
   });
   res.json(topics);
 });

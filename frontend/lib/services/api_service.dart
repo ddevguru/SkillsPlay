@@ -173,6 +173,11 @@ class ApiService {
     return res.data;
   }
 
+  Future<List<dynamic>> getPlayableLessons() async {
+    final res = await _dio.get('/tracks/playable-lessons');
+    return res.data as List;
+  }
+
   // Multiplayer
   Future<Map<String, dynamic>> createRoom({String? lessonId}) async {
     final res = await _dio.post('/rooms/create', data: {if (lessonId != null) 'lessonId': lessonId});

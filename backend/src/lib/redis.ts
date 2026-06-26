@@ -34,6 +34,16 @@ export async function cacheSet(key: string, value: unknown, ttlSeconds = 300): P
   }
 }
 
+export async function cacheDel(...keys: string[]): Promise<void> {
+  const client = getRedis();
+  if (!client || keys.length === 0) return;
+  try {
+    await client.del(...keys);
+  } catch {
+    // non-fatal
+  }
+}
+
 export async function cacheIncr(key: string): Promise<number> {
   const client = getRedis();
   if (!client) return 0;

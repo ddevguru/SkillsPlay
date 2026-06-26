@@ -151,6 +151,7 @@ model Topic {
   trackId    String     @map("track_id")
   title      String
   slug       String
+  description String    @default("")
   difficulty Difficulty @default(BASICS)
   order      Int        @default(0)
   createdAt  DateTime   @default(now()) @map("created_at")
